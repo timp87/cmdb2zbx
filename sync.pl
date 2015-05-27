@@ -6,6 +6,9 @@ use warnings;
 use JSON::RPC::Legacy::Client;
 use DBI;
 use Data::Dumper;
+use utf8;
+use Getopt::Std;
+
 
 # ZBX options
 #my $zbx_url = 'https://monitoring.example.org/api_jsonrpc.php';
@@ -19,6 +22,8 @@ my $zbx_pass = 'l00ksl!ke';
 my ($sec, $min, $hour, $day) = localtime;
 my $zbx_reqid = '0' . $day . $hour . $min . $sec;
 
+my $zbx_adm = 'ptimofeev@example.org';
+
 # CMDB options
 my $cmdb_host = 'sdeskdb';
 my $cmdb_user = 'reader';
@@ -26,6 +31,14 @@ my $cmdb_pass = 'xbnfntkm';
 
 # The main hash for hosts information
 my %hosts;
+
+# Command line arguments
+my %cmd_args;
+getopts('sdnzh:', \%cmd_args) or &print_help();
+&print_help() unless %cmd_args;
+#%cmd_args or &print_help();
+&print_help() unless ($cmd_args{'s'} or $cmd_args{'d'} or $cmd_args{'n'});
+
 
 # Debug options
 my $debug = 0;
@@ -35,6 +48,7 @@ my $ca_cert = '/etc/ssl/certs/exampleca.pem';
 
 binmode STDOUT, ':encoding(UTF-8)';
 #use open qw/ :std :encoding(UTF-8) /;
+
 
 
 
@@ -143,23 +157,38 @@ $dbh->disconnect;
 
 
 
-# Lets sync
-foreach my $hostid (keys %hosts) {
-    my %inventory;
-    while (my ($field, $value) = each %{$hosts{$hostid}}) {
-        next if ($field eq 'hostname' or $field eq 'email');
-        $inventory{$field} = $value;
+# SYNC
+if ($cmd_args{'s'}) {
+    foreach my $hostid (keys %hosts) {
+        my %inventory;
+        while (my ($field, $value) = each %{$hosts{$hostid}}) {
+            next if ($field eq 'hostname' or $field eq 'email');
+            $inventory{$field} = $value;
+        }
+        $zbx_result = &zbx_call( 'host.update',
+            {   hostid => $hostid,
+                inventory_mode => 0,
+                inventory => \%inventory,
+            },
+        );
     }
-    $zbx_result = &zbx_call( 'host.update',
-        {   hostid => $hostid,
-            inventory_mode => 0,
-            inventory => \%inventory,
-        },
-    );
 }
 
 
 
+if ($cmd_args{'d'} or $cmd_args{'n'}) {
+    my %admins;
+    foreach my $value (values %hosts) {
+        my $hostname = $value->{'hostname'};
+        my $email = $value->{'email'};
+        if (not defined $email) {
+            $admins{$zbx_adm}->{$hostname} = 'email';
+        }
+    }
+    print Dumper(\%admins) if $debug_dumper;
+}
+
+#software_full, notes, location, email, contact
 
 
 
@@ -181,4 +210,24 @@ sub zbx_call {
     die "ZBX: Method '$method' failed. ", $response->error_message->{'data'}, "\n" if $response->is_error;
 
     $response->result;
+}
+
+sub print_help {
+    if (exists $cmd_args{'h'} and not defined $cmd_args{'h'}) {
+        print "Provide a host list in -h!\n";
+    }
+
+    print "Usage:
+    $0 [-sdn] [-z] [-h <host list>]
+
+    You should use at least one of these options:
+    -s - sync hosts description from cmdb to zabbix;
+    -d - display on screen empty fields in hosts description;
+    -n - notify appropriate admins by email about empty fields in hosts description;
+
+    -z - notify only zabbix admins by email about empty fields in hosts description;
+
+    -h - work only for provided host list;\n";
+
+    exit 1;
 }
