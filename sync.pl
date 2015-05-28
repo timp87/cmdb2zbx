@@ -35,22 +35,20 @@ my %hosts;
 
 # Command line arguments
 my %cmd_args;
-getopts('sdnzh:', \%cmd_args) or &print_help();
+getopts('sdnzvh:', \%cmd_args) or &print_help();
 &print_help() unless %cmd_args;
 &print_help() unless ($cmd_args{'s'} or $cmd_args{'d'} or $cmd_args{'n'});
 
 
 # Debug options
-my $verbose = 0;
 my $debug = 0;
 
 my $ca_cert = '/etc/ssl/certs/exampleca.pem';
 
+my @hostlist = split /\s+/, $cmd_args{'h'} if $cmd_args{'h'};
 
-my @hostlist;
-if ($cmd_args{'h'}) {
-    @hostlist = split /\s+/, $cmd_args{'h'};
-}
+
+
 
 # Let's go!
 
@@ -67,7 +65,7 @@ $zbx_authid = &zbx_call( 'user.login',
         password => $zbx_pass,
     },
 );
-print "Authentication successful. Auth ID: " . $zbx_authid . "\n" if $verbose;
+print "Authentication successful. Auth ID: " . $zbx_authid . "\n" if $cmd_args{'v'};
 
 
 # Get list of hosts from ZBX
@@ -287,14 +285,15 @@ sub print_help {
     }
 
     print "Usage:
-    $0 [-sdn] [-z] [-h <host list>]
+    $0 [-sdn] [-z] [-v] [-h <host list>]
 
-    You should use at least one of these options:
+    WARNING! You should use at least one of these actions:
     -s - sync hosts description from cmdb to zabbix;
     -d - just display a list of hosts with empty description fields;
     -n - send email to appropriate admins with a list of hosts with empty description fields;
 
     -z - send email only to zabbix admins with a list of hosts with empty description fields;
+    -v - verbose output;
 
     -h - work only for provided host list;\n";
 
