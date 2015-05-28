@@ -8,6 +8,7 @@ use DBI;
 use Data::Dumper;
 use utf8;
 use Getopt::Std;
+use open qw/ :std :encoding(UTF-8) /;
 
 
 # ZBX options
@@ -45,8 +46,6 @@ my $debug = 0;
 
 my $ca_cert = '/etc/ssl/certs/exampleca.pem';
 
-binmode STDOUT, ':encoding(UTF-8)';
-#use open qw/ :std :encoding(UTF-8) /;
 
 
 
@@ -142,7 +141,11 @@ foreach my $hostid (keys %hosts) {
         while (my ($field, $value) = each %$row) {
             if (defined $value) {
                 utf8::decode($value);
-                $hosts{$hostid}->{$field} = join ', ', $hosts{$hostid}->{$field}, $value;
+                unless ($hosts{$hostid}->{$field}) {
+                    $hosts{$hostid}->{$field} = $value;
+                } else {
+                    $hosts{$hostid}->{$field} = join ', ', $hosts{$hostid}->{$field}, $value;
+                }
             }
         }
     }
@@ -178,8 +181,8 @@ if ($cmd_args{'s'}) {
 # DISPLAY AND NOTIFY
 if ($cmd_args{'d'} or $cmd_args{'n'}) {
 
-    # First make a hash for emails to admins
     my %admins;
+
     foreach my $hostinfo (values %hosts) {
         my $email = $hostinfo->{'email'};
         my $hostname = $hostinfo->{'hostname'};
@@ -187,7 +190,7 @@ if ($cmd_args{'d'} or $cmd_args{'n'}) {
 
         while (my ($field, $value) = each %{$hostinfo}) {
             next if ($field eq 'hostname' or $field eq 'email');
-            push @{$admins{$email}->{$hostname}}, $field unless $value;
+            push(@{$admins{$email}->{$hostname}}, $field) unless $value;
         }
     }
 
@@ -198,8 +201,32 @@ if ($cmd_args{'d'} or $cmd_args{'n'}) {
         print "_" x 40, "\n";
     }
 
-    if ($cmd_args{'n'}){
-        # Send email? How?
+    if ($cmd_args{'n'}) {
+        my %rus = (
+            contact => 'контактная информация',
+            software_full => 'функции и роль',
+            notes => 'реакция дежурных на типовые события',
+            location => 'местоположение',
+        );
+
+        # Send emails
+        while (my ($admin, $hosts) = each %admins) {
+            my $text;
+            if ($cmd_args{'z'}) {
+                $text .= "$admin:\n";
+                $admin = $zbx_adm;
+            }
+            foreach my $host (sort keys %{$hosts}) {
+                my @rus_fields;
+                foreach my $name (@{$hosts->{$host}}) {
+                    push @rus_fields, $rus{$name};
+                }
+                $text .= "$host: ";
+                $text .= join ', ', @rus_fields;
+                $text .= ".\n";
+            }
+            &notify($admin, $text);
+        }
     }
 }
 
@@ -228,6 +255,26 @@ sub zbx_call {
     $response->result;
 }
 
+sub notify {
+    my ($to, $text) = @_;
+
+    open (EMAIL, "| /usr/sbin/sendmail -t") or die "Cannot open EMAIL: $!\n";
+    print EMAIL <<EOF
+From: Zabbix sync <zbx_sync\@example.org>
+To: $to
+Subject: =?UTF-8?B?0JIgQ01EQiDQvdC10LTQvtGB0YLQsNGC0L7Rh9C90L4g0LjQvdGE0L7RgNC80LDRhtC40Lgh?=
+Content-Type: text/plain; charset="utf-8"
+
+ВНИМАНИЕ!
+Недостаточно информации о подответственных вам устройствах, добавленных в мониторинг.
+Список устройств и недостающей информации:
+
+$text
+Пожалуйста, заполните недостающую информацию в CMDB.
+EOF
+;
+    close EMAIL;
+}
 
 sub print_help {
     if (exists $cmd_args{'h'} and not defined $cmd_args{'h'}) {
