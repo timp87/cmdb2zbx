@@ -36,13 +36,12 @@ my %hosts;
 my %cmd_args;
 getopts('sdnzh:', \%cmd_args) or &print_help();
 &print_help() unless %cmd_args;
-#%cmd_args or &print_help();
 &print_help() unless ($cmd_args{'s'} or $cmd_args{'d'} or $cmd_args{'n'});
 
 
 # Debug options
+my $verbose = 0;
 my $debug = 0;
-my $debug_dumper = 1;
 
 my $ca_cert = '/etc/ssl/certs/exampleca.pem';
 
@@ -67,7 +66,7 @@ $zbx_authid = &zbx_call( 'user.login',
         password => $zbx_pass,
     },
 );
-print "Authentication successful. Auth ID: " . $zbx_authid . "\n" if $debug;
+print "Authentication successful. Auth ID: " . $zbx_authid . "\n" if $verbose;
 
 
 # Get list of hosts from ZBX
@@ -84,8 +83,9 @@ foreach my $line (@$zbx_result) {
     my $hostname = $line->{'name'};
     $hosts{$hostid} = {'hostname' => $hostname,};
 }
-print Dumper(\%hosts) if $debug_dumper;
-print "________________________\n" if $debug_dumper;
+print "Initial %hosts hash obtained from ZBX:\n" if $debug;
+print Dumper(\%hosts) if $debug;
+print "_" x 40, "\n" if $debug;
 
 
 # Try to make a connection and authenticate to CMDB
@@ -117,15 +117,14 @@ foreach my $hostid (keys %hosts) {
 
     while (my $row = $sth->fetchrow_hashref) {
         while (my ($field, $value) = each %$row) {
-            if (defined $value) {
-                utf8::decode($value);
+                utf8::decode($value) if defined $value;
                 $hosts{$hostid}->{$field} = $value;
-            }
         }
     }
 }
-print Dumper(\%hosts) if $debug_dumper;
-print "________________________\n" if $debug_dumper;
+print "Incomplete %hosts hash obtained from CMDB: " if $debug;
+print Dumper(\%hosts) if $debug;
+print "_" x 40, "\n" if $debug;
 
 
 # Fill the hosts hash with admins info
@@ -148,8 +147,9 @@ foreach my $hostid (keys %hosts) {
         }
     }
 }
-print Dumper(\%hosts) if $debug_dumper;
-print "________________________\n" if $debug_dumper;
+print "Complete %hosts hash obtained from CMDB: " if $debug;
+print Dumper(\%hosts) if $debug;
+print "_" x 40, "\n" if $debug;
 
 
 # Disconnect from CMDB
@@ -175,20 +175,34 @@ if ($cmd_args{'s'}) {
 }
 
 
-
+# DISPLAY AND NOTIFY
 if ($cmd_args{'d'} or $cmd_args{'n'}) {
+
+    # First make a hash for emails to admins
     my %admins;
-    foreach my $value (values %hosts) {
-        my $hostname = $value->{'hostname'};
-        my $email = $value->{'email'};
-        if (not defined $email) {
-            $admins{$zbx_adm}->{$hostname} = 'email';
+    foreach my $hostinfo (values %hosts) {
+        my $email = $hostinfo->{'email'};
+        my $hostname = $hostinfo->{'hostname'};
+        $email = $zbx_adm unless $email;
+
+        while (my ($field, $value) = each %{$hostinfo}) {
+            next if ($field eq 'hostname' or $field eq 'email');
+            push @{$admins{$email}->{$hostname}}, $field unless $value;
         }
     }
-    print Dumper(\%admins) if $debug_dumper;
+
+
+    if ($cmd_args{'d'}) {
+        print "I would send the following emails: ";
+        print Dumper(\%admins);
+        print "_" x 40, "\n";
+    }
+
+    if ($cmd_args{'n'}){
+        # Send email? How?
+    }
 }
 
-#software_full, notes, location, email, contact
 
 
 
@@ -204,13 +218,16 @@ sub zbx_call {
     };
 
     my $response = $zbx_client->call($zbx_url, $json);
-    print Dumper($response->content) if $debug_dumper;
+    print "ZBX responce: " if $debug;
+    print Dumper($response->content) if $debug;
+    print "_" x 40, "\n" if $debug;
 
     die "ZBX: The response from server is empty! Status code is '", $zbx_client->status_line, "'.\n" unless $response; 
     die "ZBX: Method '$method' failed. ", $response->error_message->{'data'}, "\n" if $response->is_error;
 
     $response->result;
 }
+
 
 sub print_help {
     if (exists $cmd_args{'h'} and not defined $cmd_args{'h'}) {
@@ -222,10 +239,10 @@ sub print_help {
 
     You should use at least one of these options:
     -s - sync hosts description from cmdb to zabbix;
-    -d - display on screen empty fields in hosts description;
-    -n - notify appropriate admins by email about empty fields in hosts description;
+    -d - just display a list of hosts with empty description fields;
+    -n - send email to appropriate admins with a list of hosts with empty description fields;
 
-    -z - notify only zabbix admins by email about empty fields in hosts description;
+    -z - send email only to zabbix admins with a list of hosts with empty description fields;
 
     -h - work only for provided host list;\n";
 
