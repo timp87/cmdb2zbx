@@ -47,8 +47,10 @@ my $debug = 0;
 my $ca_cert = '/etc/ssl/certs/exampleca.pem';
 
 
-
-
+my @hostlist;
+if ($cmd_args{'h'}) {
+    @hostlist = split /\s+/, $cmd_args{'h'};
+}
 
 # Let's go!
 
@@ -72,6 +74,9 @@ print "Authentication successful. Auth ID: " . $zbx_authid . "\n" if $verbose;
 $zbx_result = &zbx_call( 'host.get',
     {   groupids => $zbx_sync_groupid,
         output => ['hostid', 'name',],
+        filter => {
+            host => \@hostlist,
+        },
     },
 );
 
