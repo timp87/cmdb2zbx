@@ -8,7 +8,7 @@ use DBI;
 use Data::Dumper;
 use utf8;
 use Getopt::Std;
-use open qw/ :std :encoding(UTF-8) /;
+use open qw(:std :encoding(UTF-8));
 
 
 # ZBX options
@@ -33,11 +33,13 @@ my $cmdb_pass = 'xbnfntkm';
 # The main hash for hosts information
 my %hosts;
 
-# Command line arguments
+# Handle command line arguments
 my %cmd_args;
 getopts('sdnzvh:', \%cmd_args) or &print_help();
 &print_help() unless %cmd_args;
 &print_help() unless ($cmd_args{'s'} or $cmd_args{'d'} or $cmd_args{'n'});
+print "Provide a host list in -h!\n" if (exists $cmd_args{'h'} and not defined $cmd_args{'h'});
+my @hostlist = split /\s+/, $cmd_args{'h'} if $cmd_args{'h'};
 
 
 # Debug options
@@ -45,7 +47,6 @@ my $debug = 0;
 
 my $ca_cert = '/etc/ssl/certs/exampleca.pem';
 
-my @hostlist = split /\s+/, $cmd_args{'h'} if $cmd_args{'h'};
 
 
 
@@ -65,7 +66,7 @@ $zbx_authid = &zbx_call( 'user.login',
         password => $zbx_pass,
     },
 );
-print "Authentication successful. Auth ID: " . $zbx_authid . "\n" if $cmd_args{'v'};
+print "Received authID for ZBX: " . $zbx_authid . ".\n" if $cmd_args{'v'};
 
 
 # Get list of hosts from ZBX
@@ -77,6 +78,7 @@ $zbx_result = &zbx_call( 'host.get',
         },
     },
 );
+print "Received hosts from ZBX: " . @$zbx_result . ".\n" if $cmd_args{'v'};
 
 
 # Fill the hosts hash with initial info
@@ -91,12 +93,14 @@ print "_" x 40, "\n" if $debug;
 
 
 # Try to make a connection and authenticate to CMDB
+print "Connecting to CMDB $cmdb_host.\n" if $cmd_args{'v'};
 my $dbh = DBI->connect("dbi:Sybase:$cmdb_host", $cmdb_user, $cmdb_pass,
     {   PrintError => 0,        # Don't report errors via warn()
         RaiseError => 1,        # Do report errors via die()
         AutoCommit => 1,
     },
 );
+print "Connected to CMDB $cmdb_host.\n" if $cmd_args{'v'};
 
 
 # A way to set LongReadLen correctly
@@ -129,7 +133,7 @@ print Dumper(\%hosts) if $debug;
 print "_" x 40, "\n" if $debug;
 
 
-# Fill the hosts hash with admins info
+# Fill the hosts hash with additional contacs
 foreach my $hostid (keys %hosts) {
     my $hostname = $hosts{$hostid}->{'hostname'};
 
@@ -165,12 +169,16 @@ $dbh->disconnect;
 
 # SYNC
 if ($cmd_args{'s'}) {
+    print "Syncing to ZBX.\n" if $cmd_args{'v'};
     foreach my $hostid (keys %hosts) {
+
         my %inventory;
+
         while (my ($field, $value) = each %{$hosts{$hostid}}) {
             next if ($field eq 'hostname' or $field eq 'email');
             $inventory{$field} = $value;
         }
+
         $zbx_result = &zbx_call( 'host.update',
             {   hostid => $hostid,
                 inventory_mode => 0,
@@ -178,12 +186,15 @@ if ($cmd_args{'s'}) {
             },
         );
     }
+    print "Syncing to ZBX done.\n" if $cmd_args{'v'};
 }
 
 
 # DISPLAY AND NOTIFY
 if ($cmd_args{'d'} or $cmd_args{'n'}) {
+    print "Building hash for notification.\n" if $cmd_args{'v'};
 
+    # Common part. Build new admins hash
     my %admins;
 
     foreach my $hostinfo (values %hosts) {
@@ -196,6 +207,7 @@ if ($cmd_args{'d'} or $cmd_args{'n'}) {
             push(@{$admins{$email}->{$hostname}}, $field) unless $value;
         }
     }
+    print "Building done.\n" if $cmd_args{'v'};
 
 
     if ($cmd_args{'d'}) {
@@ -205,6 +217,7 @@ if ($cmd_args{'d'} or $cmd_args{'n'}) {
     }
 
     if ($cmd_args{'n'}) {
+        print "Sending emails.\n" if $cmd_args{'v'};
         my %rus = (
             contact => 'контактная информация',
             software_full => 'функции и роль',
@@ -214,9 +227,9 @@ if ($cmd_args{'d'} or $cmd_args{'n'}) {
 
         # Send emails
         while (my ($admin, $hosts) = each %admins) {
-            my $text;
+            my $about;
             if ($cmd_args{'z'}) {
-                $text .= "$admin:\n";
+                $about .= "$admin:\n";
                 $admin = $zbx_adm;
             }
             foreach my $host (sort keys %{$hosts}) {
@@ -224,12 +237,13 @@ if ($cmd_args{'d'} or $cmd_args{'n'}) {
                 foreach my $name (@{$hosts->{$host}}) {
                     push @rus_fields, $rus{$name};
                 }
-                $text .= "$host: ";
-                $text .= join ', ', @rus_fields;
-                $text .= ".\n";
+                $about .= "$host: ";
+                $about .= join ', ', @rus_fields;
+                $about .= ".\n";
             }
-            &notify($admin, $text);
+            &notify($admin, $about);
         }
+        print "All emails sent.\n" if $cmd_args{'v'};
     }
 }
 
@@ -259,7 +273,7 @@ sub zbx_call {
 }
 
 sub notify {
-    my ($to, $text) = @_;
+    my ($to, $body) = @_;
 
     open (EMAIL, "| /usr/sbin/sendmail -t") or die "Cannot open EMAIL: $!\n";
     print EMAIL <<EOF
@@ -272,7 +286,7 @@ Content-Type: text/plain; charset="utf-8"
 Недостаточно информации о подответственных вам устройствах, добавленных в мониторинг.
 Список устройств и недостающей информации:
 
-$text
+$body
 Пожалуйста, заполните недостающую информацию в CMDB.
 EOF
 ;
@@ -280,9 +294,6 @@ EOF
 }
 
 sub print_help {
-    if (exists $cmd_args{'h'} and not defined $cmd_args{'h'}) {
-        print "Provide a host list in -h!\n";
-    }
 
     print "Usage:
     $0 [-sdn] [-z] [-v] [-h <host list>]
