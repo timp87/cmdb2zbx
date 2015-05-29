@@ -38,7 +38,6 @@ my %cmd_args;
 getopts('sdnzvh:', \%cmd_args) or &print_help();
 &print_help() unless %cmd_args;
 &print_help() unless ($cmd_args{'s'} or $cmd_args{'d'} or $cmd_args{'n'});
-print "Provide a host list in -h!\n" if (exists $cmd_args{'h'} and not defined $cmd_args{'h'});
 my @hostlist = split /\s+/, $cmd_args{'h'} if $cmd_args{'h'};
 
 
@@ -294,6 +293,7 @@ EOF
 }
 
 sub print_help {
+    print "Provide a host list in -h!\n" if (exists $cmd_args{'h'} and not defined $cmd_args{'h'});
 
     print "Usage:
     $0 [-sdn] [-z] [-v] [-h <host list>]
