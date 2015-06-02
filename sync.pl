@@ -7,6 +7,7 @@ use JSON::RPC::Legacy::Client;
 use DBI;
 use Data::Dumper;
 use utf8;
+use Encode;
 use Getopt::Std;
 use open qw(:std :encoding(UTF-8));
 
@@ -102,7 +103,7 @@ my $dbh = DBI->connect("dbi:Sybase:$cmdb_host", $cmdb_user, $cmdb_pass,
 print "Connected to CMDB $cmdb_host.\n" if $cmd_args{'v'};
 
 
-# A way to set LongReadLen correctly
+# A way to set LongReadLen correctly for MSSQL
 $dbh->do("set textsize 32000");
 
 
@@ -273,13 +274,17 @@ sub zbx_call {
 
 sub notify {
     my ($to, $body) = @_;
+    # Non USASCII characters *in headers* require special encoding
+    my $subject = Encode::encode('MIME-B', 'В CMDB недостаточно информации!');
+    my $from = Encode::encode('MIME-B', 'Синхронизация Zabbix с CMDB <zbx_sync@example.org>');
 
-    open (EMAIL, "| /usr/sbin/sendmail -t") or die "Cannot open EMAIL: $!\n";
-    print EMAIL <<EOF
-From: Zabbix sync <zbx_sync\@example.org>
+    open (EMAIL, "| /usr/sbin/sendmail -t") or die "Cannot open pipe to EMAIL: $!\n";
+    print EMAIL <<EOF;
+From: $from
 To: $to
-Subject: =?UTF-8?B?0JIgQ01EQiDQvdC10LTQvtGB0YLQsNGC0L7Rh9C90L4g0LjQvdGE0L7RgNC80LDRhtC40Lgh?=
+Subject: $subject
 Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
 
 ВНИМАНИЕ!
 Недостаточно информации о подответственных вам устройствах, добавленных в мониторинг.
@@ -288,7 +293,7 @@ Content-Type: text/plain; charset="utf-8"
 $body
 Пожалуйста, заполните недостающую информацию в CMDB.
 EOF
-;
+
     close EMAIL;
 }
 
