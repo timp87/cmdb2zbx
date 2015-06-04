@@ -121,10 +121,18 @@ foreach my $hostid (keys %hosts) {
     my $sth = $dbh->prepare($sql);
     $sth->execute;
 
+    my $count;
     while (my $row = $sth->fetchrow_hashref) {
+        $count++;
         while (my ($field, $value) = each %$row) {
                 utf8::decode($value) if defined $value;
                 $hosts{$hostid}->{$field} = $value;
+        }
+    }
+
+    unless ($count) {
+        foreach my $field (qw/software_full notes location email contact/) {
+            $hosts{$hostid}->{$field} = undef;
         }
     }
 }
