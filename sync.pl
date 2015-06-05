@@ -121,18 +121,10 @@ foreach my $hostid (keys %hosts) {
     my $sth = $dbh->prepare($sql);
     $sth->execute;
 
-    my $count;
     while (my $row = $sth->fetchrow_hashref) {
-        $count++;
         while (my ($field, $value) = each %$row) {
                 utf8::decode($value) if defined $value;
                 $hosts{$hostid}->{$field} = $value;
-        }
-    }
-
-    unless ($count) {
-        foreach my $field (qw/software_full notes location email contact/) {
-            $hosts{$hostid}->{$field} = undef;
         }
     }
 }
@@ -210,10 +202,13 @@ if ($cmd_args{'d'} or $cmd_args{'n'}) {
         my $hostname = $hostinfo->{'hostname'};
         $email = $zbx_adm unless $email;
 
+        my $count;
         while (my ($field, $value) = each %{$hostinfo}) {
             next if ($field eq 'hostname' or $field eq 'email');
-            push(@{$admins{$email}->{$hostname}}, $field) unless $value;
+            $count++;
+            push (@{$admins{$email}->{$hostname}}, $field) unless $value;
         }
+        push (@{$admins{$email}->{$hostname}}, 'noinfo') unless $count;
     }
     print "Building done.\n" if $cmd_args{'v'};
 
@@ -231,6 +226,7 @@ if ($cmd_args{'d'} or $cmd_args{'n'}) {
             software_full => 'функции и роль',
             notes => 'реакция дежурных на типовые события',
             location => 'местоположение',
+            noinfo => 'узел отсутствует в CMDB',
         );
 
         # Send emails
