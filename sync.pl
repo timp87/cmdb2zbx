@@ -105,6 +105,7 @@ print "Connected to CMDB $cmdb_host.\n" if $cmd_args{'v'};
 
 # A way to set LongReadLen correctly for MSSQL
 $dbh->do("set textsize 32000");
+$dbh->do("use SdeskDB");
 
 
 # Fill the hosts hash with main info
