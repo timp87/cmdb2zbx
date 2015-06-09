@@ -13,12 +13,10 @@ use open qw(:std :encoding(UTF-8));
 
 
 # ZBX options
-#my $zbx_url = 'https://monitoring.example.org/api_jsonrpc.php';
-my $zbx_url = 'http://proxy.examplelab.org/api_jsonrpc.php';
+my $zbx_url = 'https://monitoring.example.org/api_jsonrpc.php';
 my $zbx_authid;
 my $zbx_result;
-#my $zbx_sync_groupid = 89;  # ZBX host group, the members of which we synchronize
-my $zbx_sync_groupid = 8;
+my $zbx_sync_groupid = 89;  # ZBX host group, the members of which we synchronize
 my $zbx_user = 'sync_info';
 my $zbx_pass = 'l00ksl!ke';
 my ($sec, $min, $hour, $day) = localtime;
@@ -56,8 +54,8 @@ my $ca_cert = '/etc/ssl/certs/exampleca.pem';
 
 # Create a client for ZBX
 my $zbx_client = JSON::RPC::Legacy::Client->new;
-#$zbx_client->ua->ssl_opts(verify_hostname => 1);
-#$zbx_client->ua->ssl_opts(SSL_ca_file => $ca_cert);
+$zbx_client->ua->ssl_opts(verify_hostname => 1);
+$zbx_client->ua->ssl_opts(SSL_ca_file => $ca_cert);
 
 
 # Try to authenticate to ZBX
