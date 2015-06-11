@@ -37,7 +37,8 @@ my %cmd_args;
 getopts('sdnzvh:', \%cmd_args) or &print_help();
 &print_help() unless %cmd_args;
 &print_help() unless ($cmd_args{'s'} or $cmd_args{'d'} or $cmd_args{'n'});
-my @hostlist = split /\s+/, $cmd_args{'h'} if $cmd_args{'h'};
+my @hostlist;
+@hostlist = split /\s+/, $cmd_args{'h'} if $cmd_args{'h'};
 
 
 # Debug options
@@ -282,8 +283,8 @@ sub notify {
     my $subject = Encode::encode('MIME-B', 'В CMDB недостаточно информации!');
     my $from = Encode::encode('MIME-B', 'Синхронизация Zabbix с CMDB <zbx_sync@example.org>');
 
-    open (EMAIL, "| /usr/sbin/sendmail -t") or die "Cannot open pipe to EMAIL: $!\n";
-    print EMAIL <<EOF;
+    open (my $sendmail, "|-", "/usr/sbin/sendmail -t") or die "Cannot open pipe to EMAIL: $!\n";
+    print $sendmail <<EOF;
 From: $from
 To: $to
 Subject: $subject
