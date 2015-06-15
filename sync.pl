@@ -10,6 +10,7 @@ use utf8;
 use Encode;
 use Getopt::Std;
 use open qw(:std :encoding(UTF-8));
+use MIME::Base64;
 
 
 # ZBX options
@@ -278,10 +279,17 @@ sub zbx_call {
 }
 
 sub notify {
-    my ($to, $body) = @_;
+    my ($to, $text) = @_;
     # Non USASCII characters *in headers* require special encoding
     my $subject = Encode::encode('MIME-B', 'В CMDB недостаточно информации!');
     my $from = Encode::encode('MIME-B', 'Синхронизация Zabbix с CMDB <zbx_sync@example.org>');
+
+    my $body = encode_base64(Encode::encode('utf-8', "ВНИМАНИЕ!
+Недостаточно информации о подответственных вам устройствах, добавленных в мониторинг.
+Список устройств и недостающей информации:
+
+$text
+Пожалуйста, заполните недостающую информацию в CMDB."));
 
     open (my $sendmail, "|-", "/usr/sbin/sendmail -t") or die "Cannot open pipe to EMAIL: $!\n";
     print $sendmail <<EOF;
@@ -289,14 +297,9 @@ From: $from
 To: $to
 Subject: $subject
 Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: 8bit
-
-ВНИМАНИЕ!
-Недостаточно информации о подответственных вам устройствах, добавленных в мониторинг.
-Список устройств и недостающей информации:
+Content-Transfer-Encoding: base64
 
 $body
-Пожалуйста, заполните недостающую информацию в CMDB.
 EOF
 
     close $sendmail;
