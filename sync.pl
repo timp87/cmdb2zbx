@@ -284,12 +284,14 @@ sub notify {
     my $subject = Encode::encode('MIME-B', 'В CMDB недостаточно информации!');
     my $from = Encode::encode('MIME-B', 'Синхронизация Zabbix с CMDB <zbx_sync@example.org>');
 
-    my $body = encode_base64(Encode::encode('utf-8', "ВНИМАНИЕ!
+    my $body = encode_base64(Encode::encode('utf-8', <<EOF));
+ВНИМАНИЕ!
 Недостаточно информации о подответственных вам устройствах, добавленных в мониторинг.
 Список устройств и недостающей информации:
 
 $text
-Пожалуйста, заполните недостающую информацию в CMDB."));
+Пожалуйста, заполните недостающую информацию в CMDB."
+EOF
 
     open (my $sendmail, "|-", "/usr/sbin/sendmail -t") or die "Cannot open pipe to EMAIL: $!\n";
     print $sendmail <<EOF;
@@ -298,6 +300,7 @@ To: $to
 Subject: $subject
 Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: base64
+Reply-To: $zbx_adm
 
 $body
 EOF
