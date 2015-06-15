@@ -299,7 +299,7 @@ $body
 Пожалуйста, заполните недостающую информацию в CMDB.
 EOF
 
-    close EMAIL;
+    close $sendmail;
 }
 
 sub print_help {
