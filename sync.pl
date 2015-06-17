@@ -87,9 +87,7 @@ foreach my $line (@$zbx_result) {
     my $hostname = $line->{'name'};
     $hosts{$hostid} = {'hostname' => $hostname,};
 }
-print "Initial %hosts hash obtained from ZBX:\n" if $debug;
-print Dumper(\%hosts) if $debug;
-print "_" x 40, "\n" if $debug;
+&print_debug(\%hosts, 'Initial hash obtained from ZBX: ') if $debug;
 
 
 # Try to make a connection and authenticate to CMDB
@@ -130,9 +128,7 @@ foreach my $hostid (keys %hosts) {
         }
     }
 }
-print "Incomplete %hosts hash obtained from CMDB: " if $debug;
-print Dumper(\%hosts) if $debug;
-print "_" x 40, "\n" if $debug;
+&print_debug(\%hosts, 'Incomplete hash obtained from CMDB: ') if $debug;
 
 
 # Fill the hosts hash with additional contacs
@@ -159,9 +155,7 @@ foreach my $hostid (keys %hosts) {
         }
     }
 }
-print "Complete %hosts hash obtained from CMDB: " if $debug;
-print Dumper(\%hosts) if $debug;
-print "_" x 40, "\n" if $debug;
+&print_debug(\%hosts, 'Complete hash obtained from CMDB: ') if $debug;
 
 
 # Disconnect from CMDB
@@ -215,11 +209,7 @@ if ($cmd_args{'d'} or $cmd_args{'n'}) {
     print "Building done.\n" if $cmd_args{'v'};
 
 
-    if ($cmd_args{'d'}) {
-        print "I would send the following emails: ";
-        print Dumper(\%admins);
-        print "_" x 40, "\n";
-    }
+    &print_debug(\%admins, 'I would send the following emails: ') if $cmd_args{'d'};
 
     if ($cmd_args{'n'}) {
         print "Sending emails.\n" if $cmd_args{'v'};
@@ -268,9 +258,7 @@ sub zbx_call {
     };
 
     my $response = $zbx_client->call($zbx_url, $json);
-    print "ZBX responce: " if $debug;
-    print Dumper($response->content) if $debug;
-    print "_" x 40, "\n" if $debug;
+    &print_debug($response->content, 'ZBX responce: ') if $debug;
 
     die "ZBX: The response from server is empty! Status code is '", $zbx_client->status_line, "'.\n" unless $response; 
     die "ZBX: Method '$method' failed. ", $response->error_message->{'data'}, "\n" if $response->is_error;
@@ -325,4 +313,11 @@ sub print_help {
     -h - work only for provided host list;\n";
 
     exit 1;
+}
+
+sub print_debug {
+    my ($what, $title) = @_;
+    print $title;
+    print Dumper($what);
+    print "_" x 40, "\n";
 }
