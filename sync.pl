@@ -294,6 +294,7 @@ $body
 EOF
 
     close $sendmail;
+    warn "Cannot send email to $to!\n" if $?;
 }
 
 sub print_help {
