@@ -278,7 +278,7 @@ sub notify {
 Список устройств и недостающей информации:
 
 $text
-Пожалуйста, заполните недостающую информацию в CMDB."
+Пожалуйста, заполните недостающую информацию в CMDB.
 EOF
 
     open (my $sendmail, "|-", "/usr/sbin/sendmail -t") or die "Cannot open pipe to EMAIL: $!\n";
