@@ -1,0 +1,5 @@
+General:
+this script is used to sync info from HP OpenView Service Desk CMDB to Zabbix.
+
+Extended:
+it uses direct connection to HP OpenView Service Desk CMDB's database (sorry, it's not java) and ZABBIX API.
