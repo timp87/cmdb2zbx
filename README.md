@@ -8,6 +8,7 @@ In our company we use Zabbix as a monitoring system to watch them.
 Let's syncronize some of the information from CMDB to Zabbix!
 
 ## Some Requirements
+```
 $ cat /usr/local/etc/freetds/freetds.conf
 [global]
 ....
@@ -16,3 +17,4 @@ $ cat /usr/local/etc/freetds/freetds.conf
         port = 1433
         tds version = 8.0
         client charset = UTF-8
+```
